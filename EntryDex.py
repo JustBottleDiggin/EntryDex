@@ -12,9 +12,7 @@ class EntryCollectionManager:
         self.root = root
         self.root.title("EntryDex")
         self.root.geometry("1150x600")
-
-        # Load or initialize the data
-        self.data_file = "entry_collection.json"
+        self.data_file = "entry_collection.json" # Load or initialize the data
         self.entries = self.load_data()
         self.custom_attributes = set()
         self.update_custom_attributes()
@@ -51,6 +49,8 @@ class EntryCollectionManager:
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         self.root.geometry(f"+{x}+{y}")
+
+
 
         # Left panel - Entry list
         left_frame = ttk.Frame(self.root, padding="5")
@@ -177,9 +177,18 @@ class EntryCollectionManager:
             self.tooltip.withdraw()
 
     def refresh_entry_list(self):
+        # --- Store selected index ---
+        selected_index = self.entry_listbox.curselection()
+        selected_index = selected_index if selected_index else None
+
         self.entry_listbox.delete(0, tk.END)
         for entry in self.entries:
             self.entry_listbox.insert(tk.END, entry['name'])
+
+        # --- Restore selection ---
+        if selected_index is not None:
+            self.entry_listbox.selection_set(selected_index)
+            self.entry_listbox.see(selected_index)  # Make sure it's visible
 
     def refresh_custom_attributes(self):
         # Save current values
@@ -267,13 +276,11 @@ class EntryCollectionManager:
             messagebox.showerror("Error", "Please select an entry to update!")
             return
 
-        # Extract the index from the tuple
-        index = selection[0]  # Get the first element of the tuple
-
+        index = selection[0]  # Get the first element of the tuple (the index)
         entry = self.entries[index]
 
-        entry['name'] = self.name_entry.get("1.0", tk.END).strip()  # Get name from Text widget
-        entry['description'] = self.desc_entry.get("1.0", tk.END)  # Get description from Text widget
+        entry['name'] = self.name_entry.get("1.0", tk.END).strip()
+        entry['description'] = self.desc_entry.get("1.0", tk.END)
 
         for attr, var in self.custom_entries.items():
             value = var.get()
@@ -284,7 +291,8 @@ class EntryCollectionManager:
 
         self.save_data()
         self.refresh_entry_list()
-        self.clear_inputs()
+
+        messagebox.showinfo("Applied", "Changes applied successfully!")
 
     def delete_entry(self):
         selection = self.entry_listbox.curselection()
