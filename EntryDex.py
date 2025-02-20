@@ -282,7 +282,9 @@ class EntryCollectionManager:
             return
 
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
-            index = selection
+            # Extract the index from the tuple
+            index = selection[0]  # Get the first element of the tuple
+
             del self.entries[index]
             self.save_data()
             self.refresh_entry_list()
@@ -293,7 +295,9 @@ class EntryCollectionManager:
         if not selection:
             return
 
-        index = selection
+        # Extract the index from the tuple
+        index = selection[0]  # Get the first element of the tuple
+
         entry = self.entries[index]
 
         self.name_var.set(entry.get('name', ''))
