@@ -1,5 +1,3 @@
-# By u/JustBottleDiggin or @SpaceOrganism
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
@@ -92,12 +90,12 @@ class EntryCollectionManager:
 
         ttk.Label(input_frame, text="Name:").grid(row=0, column=0, sticky=tk.W)
         self.name_var = tk.StringVar()
-        self.name_entry = tk.Text(input_frame, wrap=tk.WORD, height=1)  # Set height to 2 for 2 lines
+        self.name_entry = tk.Text(input_frame, wrap=tk.WORD, height=1)  #
         self.name_entry.grid(row=0, column=1, sticky=tk.EW)
 
         ttk.Label(input_frame, text="Description:").grid(row=1, column=0, sticky=tk.W)
         self.desc_var = tk.StringVar()
-        self.desc_entry = tk.Text(input_frame, wrap=tk.WORD, height=1)  # Use Text widget for description
+        self.desc_entry = tk.Text(input_frame, wrap=tk.WORD, height=3)  # Use Text widget for description
         self.desc_entry.grid(row=1, column=1, sticky=tk.EW)
 
         # Custom attributes frame
@@ -131,7 +129,6 @@ class EntryCollectionManager:
 
         self.refresh_entry_list()
         self.refresh_custom_attributes()
-
 
     def bind_motion(self):
         self.motion_id = self.entry_listbox.bind('<Motion>', self.on_hover)
