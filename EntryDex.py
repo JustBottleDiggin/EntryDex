@@ -6,11 +6,12 @@ import json
 from typing import Dict, List
 import os
 
+
 class EntryCollectionManager:
     def __init__(self, root):
         self.root = root
         self.root.title("EntryDex")
-        self.root.geometry("800x600")
+        self.root.geometry("1100x600")
 
         # Load or initialize the data
         self.data_file = "entry_collection.json"
@@ -42,7 +43,7 @@ class EntryCollectionManager:
 
     def create_gui(self):
         # Center the window
-        self.root.update_idletasks() # Update window size
+        self.root.update_idletasks()  # Update window size
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_width()
@@ -91,11 +92,13 @@ class EntryCollectionManager:
 
         ttk.Label(input_frame, text="Name:").grid(row=0, column=0, sticky=tk.W)
         self.name_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.name_var).grid(row=0, column=1, sticky=tk.EW)
+        self.name_entry = tk.Text(input_frame, wrap=tk.WORD, height=2)  # Set height to 2 for 2 lines
+        self.name_entry.grid(row=0, column=1, sticky=tk.EW)
 
         ttk.Label(input_frame, text="Description:").grid(row=1, column=0, sticky=tk.W)
         self.desc_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.desc_var).grid(row=1, column=1, sticky=tk.EW)
+        self.desc_entry = tk.Text(input_frame, wrap=tk.WORD, height=5)  # Use Text widget for description
+        self.desc_entry.grid(row=1, column=1, sticky=tk.EW)
 
         # Custom attributes frame
         self.custom_frame = ttk.LabelFrame(right_frame, text="Custom Attributes", padding="5")
@@ -129,8 +132,6 @@ class EntryCollectionManager:
         self.refresh_entry_list()
         self.refresh_custom_attributes()
 
-
-
     def bind_motion(self):
         self.motion_id = self.entry_listbox.bind('<Motion>', self.on_hover)
 
@@ -148,7 +149,15 @@ class EntryCollectionManager:
 
                 # Create tooltip text
                 tooltip_text = f"Name: {entry['name']}\n"
-                tooltip_text += f"Description: {entry.get('description', 'N/A')}\n"
+
+                # Wrap description text
+                words_per_line = 20  # Adjust this value as needed
+                description = entry.get('description', 'N/A')
+                words = description.split()
+                wrapped_description = ""
+                for i in range(0, len(words), words_per_line):
+                    wrapped_description += " ".join(words[i:i + words_per_line]) + "\n"
+                tooltip_text += f"Description: {wrapped_description}\n"
 
                 # Add custom attributes
                 for attr in sorted(self.custom_attributes):
@@ -231,14 +240,14 @@ class EntryCollectionManager:
                 messagebox.showerror("Error", f"An error occurred while deleting the attribute: {e}")
 
     def add_entry(self):
-        name = self.name_var.get().strip()
+        name = self.name_entry.get("1.0", tk.END).strip()  # Get name from Text widget
         if not name:
             messagebox.showerror("Error", "Name is required!")
             return
 
         entry = {
             'name': name,
-            'description': self.desc_var.get()
+            'description': self.desc_entry.get("1.0", tk.END)  # Get description from Text widget
         }
 
         # Add custom attributes
@@ -258,11 +267,13 @@ class EntryCollectionManager:
             messagebox.showerror("Error", "Please select an entry to update!")
             return
 
-        index = selection[0]  # Extract the index from the tuple
+        # Extract the index from the tuple
+        index = selection[0]  # Get the first element of the tuple
+
         entry = self.entries[index]
 
-        entry['name'] = self.name_var.get()
-        entry['description'] = self.desc_var.get()
+        entry['name'] = self.name_entry.get("1.0", tk.END).strip()  # Get name from Text widget
+        entry['description'] = self.desc_entry.get("1.0", tk.END)  # Get description from Text widget
 
         for attr, var in self.custom_entries.items():
             value = var.get()
@@ -300,16 +311,18 @@ class EntryCollectionManager:
 
         entry = self.entries[index]
 
-        self.name_var.set(entry.get('name', ''))
-        self.desc_var.set(entry.get('description', ''))
+        self.name_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
+        self.name_entry.insert("1.0", entry.get('name', ''))
+        self.desc_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
+        self.desc_entry.insert("1.0", entry.get('description', ''))
 
         # Fill custom attributes
         for attr, var in self.custom_entries.items():
             var.set(entry.get(attr, ''))
 
     def clear_inputs(self):
-        self.name_var.set("")
-        self.desc_var.set("")
+        self.name_entry.delete("1.0", tk.END)  # Clear Text widget
+        self.desc_entry.delete("1.0", tk.END)  # Clear Text widget
         for var in self.custom_entries.values():
             var.set("")
 
