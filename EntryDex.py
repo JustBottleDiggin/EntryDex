@@ -258,7 +258,7 @@ class EntryCollectionManager:
             messagebox.showerror("Error", "Please select an entry to update!")
             return
 
-        index = selection
+        index = selection[0]  # Extract the index from the tuple
         entry = self.entries[index]
 
         entry['name'] = self.name_var.get()
