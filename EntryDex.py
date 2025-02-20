@@ -252,26 +252,27 @@ class EntryCollectionManager:
                 messagebox.showerror("Error", f"An error occurred while deleting the attribute: {e}")
 
     def add_entry(self):
-        name = self.name_entry.get("1.0", tk.END).strip()  # Get name from Text widget
-        if not name:
-            messagebox.showerror("Error", "Name is required!")
-            return
-
+        # Create a blank entry with "Blank Entry" as the name
         entry = {
-            'name': name,
-            'description': self.desc_entry.get("1.0", tk.END)  # Get description from Text widget
+            'name': "Blank Entry",  # Set the name here
+            'description': ''
         }
 
-        # Add custom attributes
-        for attr, var in self.custom_entries.items():
-            value = var.get()
-            if value:
-                entry[attr] = value
+        # Add custom attributes with blank values
+        for attr in self.custom_attributes:
+            entry[attr] = ''
 
         self.entries.append(entry)
         self.save_data()
         self.refresh_entry_list()
-        self.clear_inputs()
+
+        # Select the newly added entry
+        self.entry_listbox.selection_clear(0, tk.END)
+        self.entry_listbox.selection_set(tk.END)
+        self.entry_listbox.see(tk.END)
+
+        # Optionally, you can automatically focus on the name entry field
+        self.name_entry.focus()
 
     def update_entry(self):
         selection = self.entry_listbox.curselection()
@@ -337,6 +338,8 @@ class EntryCollectionManager:
         for var in self.custom_entries.values():
             var.set("")
 
+        # Update the listbox to reflect the cleared input
+        self.refresh_entry_list()
 
 if __name__ == "__main__":
     root = tk.Tk()
