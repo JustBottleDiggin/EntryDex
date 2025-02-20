@@ -9,7 +9,6 @@ import os
 class EntryCollectionManager:
     def __init__(self, root):
         self.root = root
-        self.root.iconbitmap("icon.ico")
         self.root.title("EntryDex")
         self.root.geometry("800x600")
 
