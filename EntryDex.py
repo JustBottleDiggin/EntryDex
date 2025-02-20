@@ -1,3 +1,4 @@
+# By @SpaceOrganism or u/JustBottleDiggin
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
@@ -95,7 +96,7 @@ class EntryCollectionManager:
 
         ttk.Label(input_frame, text="Description:").grid(row=1, column=0, sticky=tk.W)
         self.desc_var = tk.StringVar()
-        self.desc_entry = tk.Text(input_frame, wrap=tk.WORD, height=3)  # Use Text widget for description
+        self.desc_entry = tk.Text(input_frame, wrap=tk.WORD, height=2)  # Use Text widget for description
         self.desc_entry.grid(row=1, column=1, sticky=tk.EW)
 
         # Custom attributes frame
@@ -142,37 +143,41 @@ class EntryCollectionManager:
         if 0 <= index < len(self.entries):
             # Get the item's bbox
             bbox = self.entry_listbox.bbox(index)
-            if bbox and event.y >= bbox[1] and event.y <= bbox[1] + bbox[3]:
-                entry = self.entries[index]
+            if bbox:
+                x, y, width, height = bbox  # Unpack bbox tuple
 
-                # Create tooltip text
-                tooltip_text = f"Name: {entry['name']}\n"
+                if y <= event.y <= y + height:  # Check within bounds
+                    entry = self.entries[index]
 
-                # Wrap description text
-                words_per_line = 20  # Adjust this value as needed
-                description = entry.get('description', 'N/A')
-                words = description.split()
-                wrapped_description = ""
-                for i in range(0, len(words), words_per_line):
-                    wrapped_description += " ".join(words[i:i + words_per_line]) + "\n"
-                tooltip_text += f"Description: {wrapped_description}\n"
+                    # Create tooltip text
+                    tooltip_text = f"Name: {entry['name']}\n"
 
-                # Add custom attributes
-                for attr in sorted(self.custom_attributes):
-                    if attr in entry:
-                        tooltip_text += f"{attr}: {entry[attr]}\n"
+                    # Check if description is not blank
+                    description = entry.get('description', '').strip()
+                    if description:
+                        words_per_line = 20
+                        words = description.split()
+                        wrapped_description = "\n".join(
+                            " ".join(words[i:i + words_per_line])
+                            for i in range(0, len(words), words_per_line)
+                        )
+                        tooltip_text += f"Description: {wrapped_description}\n"
 
-                self.tooltip_label.config(text=tooltip_text)
+                    # Add custom attributes
+                    for attr in sorted(self.custom_attributes):
+                        if attr in entry:
+                            tooltip_text += f"{attr}: {entry[attr]}\n"
 
-                # Position tooltip near cursor
-                x = self.root.winfo_pointerx() + 15
-                y = self.root.winfo_pointery() + 10
-                self.tooltip.geometry(f"+{x}+{y}")
-                self.tooltip.deiconify()
-            else:
-                self.tooltip.withdraw()
-        else:
-            self.tooltip.withdraw()
+                    self.tooltip_label.config(text=tooltip_text)
+
+                    # Position tooltip near cursor
+                    x = self.root.winfo_pointerx() + 15
+                    y = self.root.winfo_pointery() + 10
+                    self.tooltip.geometry(f"+{x}+{y}")
+                    self.tooltip.deiconify()
+                    return
+
+        self.tooltip.withdraw()
 
     def refresh_entry_list(self):
         # --- Store selected index ---
