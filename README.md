@@ -3,4 +3,4 @@ The program stores all attributes and ollection entries in the .json files.
 
 Hi Reddit!
 
-Make sure to install the latest Python & Requirements - "pip install -r requirements.txt"
+Make sure to install the latest Python & Requirements - "pip install -r requirements.txt" then run python EntryDex.py
