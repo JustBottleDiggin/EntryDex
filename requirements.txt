@@ -2,3 +2,4 @@ tkinter
 json
 typing
 os
+pillow
