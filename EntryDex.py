@@ -11,7 +11,7 @@ class EntryCollectionManager:
     def __init__(self, root):
         self.root = root
         self.root.title("EntryDex")
-        self.root.geometry("1100x600")
+        self.root.geometry("1150x600")
 
         # Load or initialize the data
         self.data_file = "entry_collection.json"
