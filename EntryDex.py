@@ -1,3 +1,5 @@
+# By u/JustBottleDiggin or @SpaceOrganism
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
