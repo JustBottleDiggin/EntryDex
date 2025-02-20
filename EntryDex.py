@@ -65,7 +65,7 @@ class EntryCollectionManager:
         scrollbar = ttk.Scrollbar(listbox_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.entry_listbox = tk.Listbox(listbox_frame, width=30, height=20, yscrollcommand=scrollbar.set)
+        self.entry_listbox = tk.Listbox(listbox_frame, width=60, height=20, yscrollcommand=scrollbar.set)
         self.entry_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.entry_listbox.yview)
 
@@ -128,6 +128,8 @@ class EntryCollectionManager:
 
         self.refresh_entry_list()
         self.refresh_custom_attributes()
+
+
 
     def bind_motion(self):
         self.motion_id = self.entry_listbox.bind('<Motion>', self.on_hover)
