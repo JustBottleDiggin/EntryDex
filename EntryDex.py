@@ -18,6 +18,7 @@ class EntryCollectionManager:
 
         self.create_gui()
 
+
     def load_data(self) -> List[Dict]:
         if os.path.exists(self.data_file):
             try:
@@ -128,8 +129,26 @@ class EntryCollectionManager:
         # --- Add Clear Fields button ---
         ttk.Button(button_frame, text="Clear Fields", command=self.clear_inputs).pack(side=tk.LEFT, padx=5)
 
+        # Search bar
+        search_frame = ttk.Frame(left_frame, padding="5")
+        search_frame.pack(fill=tk.X)
+
+        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", self.search_entries)  # Bind search function
+        ttk.Entry(search_frame, textvariable=self.search_var).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
         self.refresh_entry_list()
         self.refresh_custom_attributes()
+
+    def search_entries(self, *args):
+        search_term = self.search_var.get().lower()
+        self.entry_listbox.delete(0, tk.END)
+        for entry in self.entries:
+            if search_term in entry['name'].lower() or \
+                    search_term in entry.get('description', '').lower() or \
+                    any(search_term in str(value).lower() for value in entry.values()):
+                self.entry_listbox.insert(tk.END, entry['name'])
 
     def bind_motion(self):
         self.motion_id = self.entry_listbox.bind('<Motion>', self.on_hover)
