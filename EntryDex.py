@@ -486,13 +486,41 @@ class EntryCollectionManager:
         self.save_data()  # This will now sort the entries
         self.refresh_entry_list()
 
-        # Select the newly added entry
+        # Select the newly added entry (always select the last item)
         self.entry_listbox.selection_clear(0, tk.END)
-        self.entry_listbox.selection_set(tk.END)
-        self.entry_listbox.see(tk.END)
+        self.entry_listbox.selection_set(tk.END)  # Select the last item (new entry)
+        self.entry_listbox.see(tk.END)  # Make sure it's visible
+
+        self.on_select_entry(None)  # Call on_select_entry explicitly
 
         # Optionally, you can automatically focus on the name entry field
         self.name_entry.focus()
+
+    def on_select_entry(self, event):
+        selection = self.entry_listbox.curselection()
+        if not selection:
+            if event is None:  # Handle explicit call
+                index = self.entry_listbox.size() - 1  # Get the last index
+            else:
+                return  # No action if no selection is made
+        else:
+            index = selection[0]  # Get the first element of the tuple (the index)
+
+        entry = self.entries[index]
+
+        # Update the entry fields with selected entry data
+        self.name_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
+        self.name_entry.insert("1.0", entry.get('name', ''))
+        self.desc_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
+        self.desc_entry.insert("1.0", entry.get('description', ''))
+
+        # Fill custom attributes
+        for attr, var in self.custom_entries.items():
+            var.set(entry.get(attr, ''))
+
+        # Display associated images for the selected entry
+        if selection:
+            self.display_images(entry)
 
     def update_entry(self):
         selection = self.entry_listbox.curselection()
@@ -542,7 +570,7 @@ class EntryCollectionManager:
 
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
             # Extract the index from the tuple
-            index = selection  # Get the first element of the tuple
+            index = selection[0] # Get the first element of the tuple
 
             del self.entries[index]
             self.save_data()
