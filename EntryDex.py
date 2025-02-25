@@ -1,9 +1,10 @@
 # By @SpaceOrganism or u/JustBottleDiggin
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import json
 from typing import Dict, List
 import os
+from PIL import Image, ImageTk
 
 
 class EntryCollectionManager:
@@ -140,6 +141,121 @@ class EntryCollectionManager:
 
         self.refresh_entry_list()
         self.refresh_custom_attributes()
+
+        # --- Image display area ---
+        self.image_frame = ttk.LabelFrame(right_frame, text="Images", padding="5")
+        self.image_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        self.image_labels = []  # To store image labels for display
+
+        # --- Image buttons ---
+        image_button_frame = ttk.Frame(right_frame)
+        image_button_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Button(image_button_frame, text="Upload Image", command=self.upload_image).pack(side=tk.LEFT, padx=5)
+        ttk.Button(image_button_frame, text="Delete Image", command=self.delete_image).pack(side=tk.LEFT, padx=5)
+
+    def upload_image(self):
+        selection = self.entry_listbox.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Please select an entry to upload an image for!")
+            return
+
+        index = selection[0]
+        entry = self.entries[index]
+
+        file_path = filedialog.askopenfilename(
+            defaultextension=".png",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return
+
+        try:
+            # Save the image to the project root folder
+            image_name = os.path.basename(file_path)
+            destination_path = os.path.join(os.getcwd(), image_name)  # Save to project root
+            with Image.open(file_path) as img:
+                img.save(destination_path)
+
+            # Store the image path in the entry
+            if 'images' not in entry:
+                entry['images'] = []
+            entry['images'].append(image_name)
+            self.save_data()
+
+            # Display the image
+            self.display_images(entry)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to upload image: {e}")
+
+    def delete_image(self):
+        selection = self.entry_listbox.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Please select an entry!")
+            return
+
+        index = selection[0]
+        entry = self.entries[index]
+
+        if 'images' not in entry or not entry['images']:
+            messagebox.showinfo("Info", "No images to delete for this entry.")
+            return
+
+        # Ask the user to select an image to delete (you can modify this for multiple image selection)
+        image_to_delete = filedialog.askopenfilename(
+            initialdir=os.getcwd(),  # Start in the project root folder
+            title="Select Image to Delete",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp"), ("All files", "*.*")]
+        )
+        if not image_to_delete:
+            return
+
+        try:
+            image_name = os.path.basename(image_to_delete)
+            if image_name in entry['images']:
+                # Remove the image from the entry
+                entry['images'].remove(image_name)
+
+                # Remove the 'images' attribute if the list is now empty
+                if not entry['images']:
+                    del entry['images']
+
+                self.save_data()
+
+                # Delete the image file
+                os.remove(image_to_delete)
+
+                # Refresh the image display
+                self.display_images(entry)
+            else:
+                messagebox.showerror("Error", "Image not found in this entry.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete image: {e}")
+
+    def display_images(self, entry):
+        # Clear existing image labels
+        for widget in self.image_frame.winfo_children():
+            widget.destroy()
+        self.image_labels.clear()
+
+        if 'images' in entry:
+            for i, image_name in enumerate(entry['images']):
+                try:
+                    image_path = os.path.join(os.getcwd(), image_name)
+                    img = Image.open(image_path)
+                    img.thumbnail((100, 100))  # Resize image for display
+                    photo = ImageTk.PhotoImage(img)
+
+                    label = ttk.Label(self.image_frame, image=photo)
+                    label.image = photo  # Keep a reference to avoid garbage collection
+                    label.grid(row=i // 3, column=i % 3, padx=5, pady=5)  # Grid layout (3 images per row)
+                    self.image_labels.append(label)
+
+                except Exception as e:
+                    print(f"Failed to load image {image_name}: {e}")
 
     def search_entries(self, *args):
         search_term = self.search_var.get().lower()
@@ -350,6 +466,12 @@ class EntryCollectionManager:
         # Fill custom attributes
         for attr, var in self.custom_entries.items():
             var.set(entry.get(attr, ''))
+
+        selection = self.entry_listbox.curselection()
+        if selection:
+            index = selection[0]
+            entry = self.entries[index]
+            self.display_images(entry)  # Display images when an entry is selected
 
     def clear_inputs(self):
         self.name_entry.delete("1.0", tk.END)  # Clear Text widget
