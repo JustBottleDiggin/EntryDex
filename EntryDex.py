@@ -513,11 +513,26 @@ class EntryCollectionManager:
             elif attr in entry:
                 del entry[attr]
 
+        updated_entry_name = entry['name']  # Store the name
+
         self.entries.sort(key=lambda x: x['name'].lower())  # Sort here
         self.save_data()
         self.refresh_entry_list()
 
+        updated_index = self.find_entry_index(updated_entry_name)  # Find the new index
+
+        if updated_index is not None:
+            self.entry_listbox.selection_clear(0, tk.END)
+            self.entry_listbox.selection_set(updated_index)
+            self.entry_listbox.see(updated_index)  # Make sure it's visible
+
         messagebox.showinfo("Applied", "Changes applied successfully!")
+
+    def find_entry_index(self, entry_name):
+        for i, entry in enumerate(self.entries):
+            if entry['name'] == entry_name:
+                return i
+        return None  # Entry not found
 
     def delete_entry(self):
         selection = self.entry_listbox.curselection()
