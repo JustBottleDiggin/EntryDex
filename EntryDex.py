@@ -24,14 +24,19 @@ class EntryCollectionManager:
         if os.path.exists(self.data_file):
             try:
                 with open(self.data_file, 'r') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # Sort data here when loading
+                    data.sort(key=lambda x: x['name'].lower())  # Case-insensitive sorting
+                    return data
             except json.JSONDecodeError:
                 return []
         return []
 
     def save_data(self):
         with open(self.data_file, 'w') as f:
-            json.dump(self.entries, f, indent=2)
+            json.dump(self.entries, f, indent=2)  # No sorting here
+
+
 
     def update_custom_attributes(self):
         for entry in self.entries:
@@ -478,7 +483,7 @@ class EntryCollectionManager:
             entry[attr] = ''
 
         self.entries.append(entry)
-        self.save_data()
+        self.save_data()  # This will now sort the entries
         self.refresh_entry_list()
 
         # Select the newly added entry
@@ -508,6 +513,7 @@ class EntryCollectionManager:
             elif attr in entry:
                 del entry[attr]
 
+        self.entries.sort(key=lambda x: x['name'].lower())  # Sort here
         self.save_data()
         self.refresh_entry_list()
 
