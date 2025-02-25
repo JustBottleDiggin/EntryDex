@@ -254,8 +254,88 @@ class EntryCollectionManager:
                     label.grid(row=i // 3, column=i % 3, padx=5, pady=5)  # Grid layout (3 images per row)
                     self.image_labels.append(label)
 
+                    # --- Bind click event to open popup ---
+                    label.bind("<Button-1>", lambda e, path=image_path: self.open_popup(path))
+
                 except Exception as e:
                     print(f"Failed to load image {image_name}: {e}")
+
+    def open_popup(self, image_path):
+        # Create a new Toplevel window for the popup
+        popup = tk.Toplevel(self.root)
+        popup.title("Zoomable Image")
+
+        # Load and display the image in the popup
+        self.zoom_factor = 1.0  # Initialize zoom factor
+        self.current_image = Image.open(image_path)  # Store the original image
+        photo = ImageTk.PhotoImage(self.current_image)
+        image_label = ttk.Label(popup, image=photo)
+        image_label.image = photo
+        image_label.pack()
+
+        # --- Variables for dragging ---
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+
+        def start_drag(event):
+            self.drag_start_x = event.x
+            self.drag_start_y = event.y
+
+        def drag(event):
+            x = image_label.winfo_x() + event.x - self.drag_start_x
+            y = image_label.winfo_y() + event.y - self.drag_start_y
+            image_label.place(x=x, y=y)
+
+        image_label.bind("<ButtonPress-1>", start_drag)
+        image_label.bind("<B1-Motion>", drag)
+
+        # Bind mouse wheel event for zoom
+        image_label.bind("<MouseWheel>", self.zoom)
+
+    def zoom(self, event):
+        if event.delta > 0:
+            self.zoom_factor *= 1.1  # Zoom in
+        else:
+            self.zoom_factor /= 1.1  # Zoom out
+
+        # Calculate the center of the zoom based on cursor position
+        x = event.x
+        y = event.y
+        width, height = self.current_image.size
+
+        # --- Calculate zoom size while maintaining aspect ratio ---
+        new_width = int(width * self.zoom_factor)
+        new_height = int(height * self.zoom_factor)
+
+        # --- Prevent image from getting too large ---
+        max_width = self.root.winfo_screenwidth() // 2  # Limit to half the screen width
+        max_height = self.root.winfo_screenheight() // 2  # Limit to half the screen height
+        if new_width > max_width or new_height > max_height:
+            return  # Don't zoom if it exceeds the limits
+
+        # Determine the zoom factor that limits the scaling to the smaller dimension
+        if new_width > new_height:
+            zoom_factor = new_height / height
+        else:
+            zoom_factor = new_width / width
+
+        new_width = int(width * zoom_factor)
+        new_height = int(height * zoom_factor)
+
+        # Calculate the bounding box for the zoomed image
+        left = max(0, x - new_width // 2)
+        top = max(0, y - new_height // 2)
+        right = min(width, x + new_width // 2)
+        bottom = min(height, y + new_height // 2)
+
+        # Crop and resize the image
+        zoomed_image = self.current_image.crop((left, top, right, bottom)).resize((new_width, new_height))
+        photo = ImageTk.PhotoImage(zoomed_image)
+
+        # Update the image label in the popup
+        image_label = event.widget  # Get the label from the event
+        image_label.config(image=photo)
+        image_label.image = photo
 
     def search_entries(self, *args):
         search_term = self.search_var.get().lower()
