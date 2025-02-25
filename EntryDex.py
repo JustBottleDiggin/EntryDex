@@ -408,10 +408,10 @@ class EntryCollectionManager:
         for entry in self.entries:
             self.entry_listbox.insert(tk.END, entry['name'])
 
-        # --- Restore selection ---
+        # Restore selection if there was one
         if selected_index is not None:
             self.entry_listbox.selection_set(selected_index)
-            self.entry_listbox.see(selected_index)  # Make sure it's visible
+            self.entry_listbox.see(selected_index)
 
     def refresh_custom_attributes(self):
         # Save current values
@@ -542,43 +542,49 @@ class EntryCollectionManager:
 
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
             # Extract the index from the tuple
-            index = selection[0]  # Get the first element of the tuple
+            index = selection  # Get the first element of the tuple
 
             del self.entries[index]
             self.save_data()
             self.refresh_entry_list()
             self.clear_inputs()
 
-    def on_select_entry(self, event):
-        selection = self.entry_listbox.curselection()
-        if not selection:
-            return
+            # Clear the selected index after deleting
+            self.selected_index = None
 
-        # Extract the index from the tuple
-        index = selection[0]  # Get the first element of the tuple
 
-        entry = self.entries[index]
-
-        self.name_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
-        self.name_entry.insert("1.0", entry.get('name', ''))
-        self.desc_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
-        self.desc_entry.insert("1.0", entry.get('description', ''))
-
-        # Fill custom attributes
-        for attr, var in self.custom_entries.items():
-            var.set(entry.get(attr, ''))
-
+    def on_select_entry(self, event=None):
         selection = self.entry_listbox.curselection()
         if selection:
             index = selection[0]
+
+            # Update the selected index
+            self.selected_index = index
+
             entry = self.entries[index]
-            self.display_images(entry)  # Display images when an entry is selected
+
+            self.name_entry.delete("1.0", tk.END)
+            self.name_entry.insert("1.0", entry.get('name', ''))
+            self.desc_entry.delete("1.0", tk.END)
+            self.desc_entry.insert("1.0", entry.get('description', ''))
+
+            for attr, var in self.custom_entries.items():
+                var.set(entry.get(attr, ''))
+
+            self.display_images(entry)
+
+        elif self.selected_index is not None:  # No selection but had one before
+            # Keep the previous selection active
+            self.entry_listbox.selection_set(self.selected_index)
 
     def clear_inputs(self):
         self.name_entry.delete("1.0", tk.END)  # Clear Text widget
         self.desc_entry.delete("1.0", tk.END)  # Clear Text widget
         for var in self.custom_entries.values():
             var.set("")
+
+        # Clear the selected index
+        self.selected_index = None
 
         # Update the listbox to reflect the cleared input
         self.refresh_entry_list()
