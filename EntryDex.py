@@ -1,623 +1,654 @@
-# By @SpaceOrganism or u/JustBottleDiggin
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+import customtkinter as ctk
 import json
-from typing import Dict, List
 import os
-from PIL import Image, ImageTk
+import re
+from tkinter import messagebox, filedialog
+from PIL import Image
+
+# --- Backend Functions ---
+DATA_FILE = 'bottles.json'
 
 
-class EntryCollectionManager:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("EntryDex")
-        self.root.geometry("1150x600")
-        self.data_file = "entry_collection.json" # Load or initialize the data
-        self.entries = self.load_data()
-        self.custom_attributes = set()
-        self.update_custom_attributes()
-
-        self.create_gui()
-
-
-    def load_data(self) -> List[Dict]:
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, 'r') as f:
-                    data = json.load(f)
-                    # Sort data here when loading
-                    data.sort(key=lambda x: x['name'].lower())  # Case-insensitive sorting
-                    return data
-            except json.JSONDecodeError:
-                return []
+def load_data():
+    if not os.path.exists(DATA_FILE) or os.stat(DATA_FILE).st_size == 0:
         return []
-
-    def save_data(self):
-        with open(self.data_file, 'w') as f:
-            json.dump(self.entries, f, indent=2)  # No sorting here
-
-
-
-    def update_custom_attributes(self):
-        for entry in self.entries:
-            self.custom_attributes.update(entry.keys())
-        # Remove standard attributes
-        self.custom_attributes.discard('name')
-        self.custom_attributes.discard('description')
-
-    def create_gui(self):
-        # Center the window
-        self.root.update_idletasks()  # Update window size
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        window_width = self.root.winfo_width()
-        window_height = self.root.winfo_height()
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        self.root.geometry(f"+{x}+{y}")
-
-
-
-        # Left panel - Entry list
-        left_frame = ttk.Frame(self.root, padding="5")
-        left_frame.pack(side=tk.LEFT, fill=tk.Y)
-
-        ttk.Label(left_frame, text="Entry Collection").pack()
-
-        # Create a frame for the listbox and scrollbar
-        listbox_frame = ttk.Frame(left_frame)
-        listbox_frame.pack(pady=5, fill=tk.BOTH, expand=True)
-
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(listbox_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.entry_listbox = tk.Listbox(listbox_frame, width=60, height=20, yscrollcommand=scrollbar.set)
-        self.entry_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.entry_listbox.yview)
-
-        # Bind events for selection and hover
-        self.entry_listbox.bind('<<ListboxSelect>>', self.on_select_entry)
-        self.entry_listbox.bind('<Enter>', lambda e: self.bind_motion())
-        self.entry_listbox.bind('<Leave>', lambda e: self.unbind_motion())
-
-        # Create tooltip
-        self.tooltip = tk.Toplevel(self.root)
-        self.tooltip.withdraw()
-        self.tooltip.overrideredirect(True)
-        self.tooltip_label = ttk.Label(self.tooltip, background='lightyellow', relief='solid')
-        self.tooltip_label.pack()
-
-        # Right panel - Details and input
-        right_frame = ttk.Frame(self.root, padding="5")
-        right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Input fields
-        input_frame = ttk.LabelFrame(right_frame, text="Entry Details", padding="5")
-        input_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(input_frame, text="Name:").grid(row=0, column=0, sticky=tk.W)
-        self.name_var = tk.StringVar()
-        self.name_entry = tk.Text(input_frame, wrap=tk.WORD, height=1)  #
-        self.name_entry.grid(row=0, column=1, sticky=tk.EW)
-
-        ttk.Label(input_frame, text="Description:").grid(row=1, column=0, sticky=tk.W)
-        self.desc_var = tk.StringVar()
-        self.desc_entry = tk.Text(input_frame, wrap=tk.WORD, height=2)  # Use Text widget for description
-        self.desc_entry.grid(row=1, column=1, sticky=tk.EW)
-
-        # Custom attributes frame
-        self.custom_frame = ttk.LabelFrame(right_frame, text="Custom Attributes", padding="5")
-        self.custom_frame.pack(fill=tk.X, pady=5)
-
-        # Custom attribute entries
-        self.custom_entries = {}
-
-        # Buttons
-        button_frame = ttk.Frame(right_frame)
-        button_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Button(button_frame, text="Add Entry", command=self.add_entry).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Update Entry", command=self.update_entry).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Delete Entry", command=self.delete_entry).pack(side=tk.LEFT, padx=5)
-
-        # New attribute section
-        attr_frame = ttk.Frame(right_frame)
-        attr_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(attr_frame, text="Attribute:").pack(side=tk.LEFT)
-        self.new_attr_var = tk.StringVar()
-        ttk.Entry(attr_frame, textvariable=self.new_attr_var).pack(side=tk.LEFT, padx=5)
-        ttk.Button(attr_frame, text="Add Attribute", command=self.add_attribute).pack(side=tk.LEFT)
-
-        ttk.Button(attr_frame, text="Delete Attribute", command=self.delete_attribute).pack(side=tk.LEFT, padx=5)
-
-        # --- Add Clear Fields button ---
-        ttk.Button(button_frame, text="Clear Fields", command=self.clear_inputs).pack(side=tk.LEFT, padx=5)
-
-        # Search bar
-        search_frame = ttk.Frame(left_frame, padding="5")
-        search_frame.pack(fill=tk.X)
-
-        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", self.search_entries)  # Bind search function
-        ttk.Entry(search_frame, textvariable=self.search_var).pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        self.refresh_entry_list()
-        self.refresh_custom_attributes()
-
-        # --- Image display area ---
-        self.image_frame = ttk.LabelFrame(right_frame, text="Images", padding="5")
-        self.image_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        self.image_labels = []  # To store image labels for display
-
-        # --- Image buttons ---
-        image_button_frame = ttk.Frame(right_frame)
-        image_button_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Button(image_button_frame, text="Upload Image", command=self.upload_image).pack(side=tk.LEFT, padx=5)
-        ttk.Button(image_button_frame, text="Delete Image", command=self.delete_image).pack(side=tk.LEFT, padx=5)
-
-    def upload_image(self):
-        selection = self.entry_listbox.curselection()
-        if not selection:
-            messagebox.showerror("Error", "Please select an entry to upload an image for!")
-            return
-
-        index = selection[0]
-        entry = self.entries[index]
-
-        file_path = filedialog.askopenfilename(
-            defaultextension=".png",
-            filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp"), ("All files", "*.*")]
-        )
-        if not file_path:
-            return
-
+    with open(DATA_FILE, 'r') as f:
         try:
-            # Save the image to the project root folder
-            image_name = os.path.basename(file_path)
-            destination_path = os.path.join(os.getcwd(), image_name)  # Save to project root
-            with Image.open(file_path) as img:
-                img.save(destination_path)
+            return json.load(f)
+        except json.JSONDecodeError:
+            messagebox.showerror("Error",
+                                 "Could not decode JSON. File might be corrupted or empty. Starting with empty data.")
+            return []
 
-            # Store the image path in the entry
-            if 'images' not in entry:
-                entry['images'] = []
-            entry['images'].append(image_name)
-            self.save_data()
 
-            # Display the image
-            self.display_images(entry)
+def save_data(data):
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to upload image: {e}")
 
-    def delete_image(self):
-        selection = self.entry_listbox.curselection()
-        if not selection:
-            messagebox.showerror("Error", "Please select an entry!")
-            return
+def generate_id(data):
+    if not data:
+        return "BTL001"
+    last_id = "BTL000"
+    for item in data:
+        if 'id' in item and item['id'].startswith("BTL") and item['id'][3:].isdigit():
+            if item['id'] > last_id:
+                last_id = item['id']
+    try:
+        current_num = int(last_id[3:])
+    except ValueError:
+        current_num = 0
+    new_num = current_num + 1
+    return f"BTL{new_num:03d}"
 
-        index = selection[0]
-        entry = self.entries[index]
 
-        if 'images' not in entry or not entry['images']:
-            messagebox.showinfo("Info", "No images to delete for this entry.")
-            return
+def find_bottle_by_id(bottle_id, bottles):
+    for i, bottle in enumerate(bottles):
+        if bottle.get('id') == bottle_id:
+            return bottle, i
+    return None, -1
 
-        # Ask the user to select an image to delete (you can modify this for multiple image selection)
-        image_to_delete = filedialog.askopenfilename(
-            initialdir=os.getcwd(),  # Start in the project root folder
-            title="Select Image to Delete",
-            filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp"), ("All files", "*.*")]
+
+# --- Main Application Class ---
+class EntryDexApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("EntryDex")
+        self.geometry("1200x800")
+        self.minsize(1000, 700)
+
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        self.fields = [
+            ("Name/Description:", "name"),
+            ("Type/Category:", "type"),
+            ("Color:", "color"),
+            ("Era/Date Range:", "era"),
+            ("Condition:", "condition"),
+            ("Embossing/Markings (optional):", "embossing"),
+            ("Closure Type (optional):", "closure_type"),
+            ("Base Markings (optional):", "base_markings"),
+            ("Location in Collection (optional):", "location")
+        ]
+
+        self.add_image_path = None
+        self.edit_image_path = None
+        self.placeholder_image = ctk.CTkImage(light_image=Image.new("RGB", (150, 150), "#E0E0E0"),
+                                              dark_image=Image.new("RGB", (150, 150), "#2A2A2A"),
+                                              size=(150, 150))
+
+        # --- Sidebar Frame ---
+        self.sidebar_frame = ctk.CTkFrame(self, width=180, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        self.sidebar_frame.grid_rowconfigure(5, weight=1)
+
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="EntryDex", font=ctk.CTkFont(size=24, weight="bold"))
+        self.logo_label.grid(row=0, column=0, padx=20, pady=20)
+
+        self.add_button = ctk.CTkButton(self.sidebar_frame, text="Add Entry", command=self.show_add_frame)
+        self.add_button.grid(row=1, column=0, padx=20, pady=10)
+
+        self.view_button = ctk.CTkButton(self.sidebar_frame, text="View All", command=self.show_view_frame)
+        self.view_button.grid(row=2, column=0, padx=20, pady=10)
+
+        self.search_button = ctk.CTkButton(self.sidebar_frame, text="Search/Edit",
+                                           command=self.show_search_edit_delete_frame)
+        self.search_button.grid(row=3, column=0, padx=20, pady=10)
+
+        self.reports_button = ctk.CTkButton(self.sidebar_frame, text="Reports", command=self.show_reports_frame)
+        self.reports_button.grid(row=4, column=0, padx=20, pady=10)
+
+        self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w")
+        self.appearance_mode_label.grid(row=6, column=0, padx=20, pady=(10, 0))
+        self.appearance_mode_optionemenu = ctk.CTkOptionMenu(self.sidebar_frame, values=["Light", "Dark", "System"],
+                                                             command=self.change_appearance_mode_event)
+        self.appearance_mode_optionemenu.grid(row=7, column=0, padx=20, pady=(10, 20))
+
+        # --- Main Content Frame ---
+        self.main_content_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.main_content_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        self.main_content_frame.grid_columnconfigure(0, weight=1)
+        self.main_content_frame.grid_rowconfigure(0, weight=1)
+
+        self.frames = {}
+        self._create_add_frame()
+        self._create_view_frame()
+        self._create_search_edit_delete_frame()
+        self._create_reports_frame()
+
+        self.show_frame("AddBottleFrame")
+
+        self.bottles_data = load_data()
+        if not os.path.exists(DATA_FILE):
+            save_data([])
+
+    def change_appearance_mode_event(self, new_appearance_mode: str):
+        ctk.set_appearance_mode(new_appearance_mode)
+
+    def show_frame(self, frame_name):
+        for frame in self.frames.values():
+            frame.grid_forget()
+        frame = self.frames[frame_name]
+        frame.grid(row=0, column=0, sticky="nsew")
+
+    def _create_add_frame(self):
+        frame = ctk.CTkFrame(self.main_content_frame, corner_radius=10)
+        self.frames["AddBottleFrame"] = frame
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_rowconfigure(0, weight=1)
+
+        container = ctk.CTkFrame(frame)
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+        container.grid_columnconfigure(0, weight=2)
+        container.grid_columnconfigure(1, weight=1)
+        container.grid_rowconfigure(0, weight=1)
+
+        scrollable_form_frame = ctk.CTkScrollableFrame(container, label_text="Enter New Entry Details")
+        scrollable_form_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        scrollable_form_frame.grid_columnconfigure(1, weight=1)
+
+        self.entry_widgets = {}
+        row_counter = 0
+        for i, (label_text, key) in enumerate(self.fields):
+            label = ctk.CTkLabel(scrollable_form_frame, text=label_text, anchor="w")
+            label.grid(row=i, column=0, padx=(10, 5), pady=5, sticky="w")
+            entry = ctk.CTkEntry(scrollable_form_frame)
+            entry.grid(row=i, column=1, padx=(5, 10), pady=5, sticky="ew")
+            self.entry_widgets[key] = entry
+            row_counter = i
+
+        row_counter += 1
+        notes_label = ctk.CTkLabel(scrollable_form_frame, text="Notes/Comments (optional):", anchor="w")
+        notes_label.grid(row=row_counter, column=0, padx=(10, 5), pady=5, sticky="nw")
+        self.notes_entry = ctk.CTkTextbox(scrollable_form_frame, height=80, wrap="word")
+        self.notes_entry.grid(row=row_counter, column=1, padx=(5, 10), pady=5, sticky="nsew")
+
+        row_counter += 1
+        addresses_label = ctk.CTkLabel(scrollable_form_frame, text="Related Addresses (optional):", anchor="w")
+        addresses_label.grid(row=row_counter, column=0, padx=(10, 5), pady=5, sticky="nw")
+        self.add_addresses_entry = ctk.CTkTextbox(scrollable_form_frame, height=80, wrap="word")
+        self.add_addresses_entry.grid(row=row_counter, column=1, padx=(5, 10), pady=5, sticky="nsew")
+
+        scrollable_form_frame.grid_rowconfigure(row_counter, weight=1)
+
+        image_frame = ctk.CTkFrame(container)
+        image_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        image_frame.grid_rowconfigure(0, weight=1)
+
+        self.add_image_preview = ctk.CTkLabel(image_frame, text="", image=self.placeholder_image)
+        self.add_image_preview.grid(row=0, column=0, padx=20, pady=20, sticky="n")
+
+        select_image_button = ctk.CTkButton(image_frame, text="Select Image", command=self._select_add_image)
+        select_image_button.grid(row=1, column=0, padx=20, pady=20, sticky="s")
+
+        add_button_submit = ctk.CTkButton(frame, text="Add Entry to Collection", command=self._add_bottle_gui)
+        add_button_submit.pack(pady=20)
+
+    def _create_view_frame(self):
+        frame = ctk.CTkFrame(self.main_content_frame, corner_radius=10)
+        self.frames["ViewAllFrame"] = frame
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
+
+        label = ctk.CTkLabel(frame, text="Full Collection", font=ctk.CTkFont(size=18, weight="bold"))
+        label.grid(row=0, column=0, pady=(20, 10), padx=20)
+
+        self.view_scrollable_frame = ctk.CTkScrollableFrame(frame)
+        self.view_scrollable_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+        self.view_scrollable_frame.grid_columnconfigure(0, weight=1)
+
+        refresh_button = ctk.CTkButton(frame, text="Refresh List", command=lambda: self._view_all_bottles_gui())
+        refresh_button.grid(row=2, column=0, pady=20)
+
+    def _create_search_edit_delete_frame(self):
+        frame = ctk.CTkFrame(self.main_content_frame, corner_radius=10)
+        self.frames["SearchEditDeleteFrame"] = frame
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(2, weight=1)
+
+        label = ctk.CTkLabel(frame, text="Search, Edit & Delete Entries", font=ctk.CTkFont(size=18, weight="bold"))
+        label.grid(row=0, column=0, pady=20, columnspan=2)
+
+        search_frame = ctk.CTkFrame(frame)
+        search_frame.grid(row=1, column=0, pady=10, padx=20, sticky="ew", columnspan=2)
+        search_frame.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(search_frame, text="Search Term:").grid(row=0, column=0, padx=(5, 0), pady=5, sticky="w")
+        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="Enter keyword or specific value")
+        self.search_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.search_type_combobox = ctk.CTkComboBox(search_frame, values=["Keyword", "Type", "Color", "Era"])
+        self.search_type_combobox.set("Keyword")
+        self.search_type_combobox.grid(row=0, column=2, padx=5, pady=5, sticky="w")
+        ctk.CTkButton(search_frame, text="Search", command=self._search_bottles_gui).grid(row=0, column=3, padx=(0, 5),
+                                                                                          pady=5)
+
+        self.search_results_textbox = ctk.CTkTextbox(frame, wrap="word", height=100)
+        self.search_results_textbox.grid(row=2, column=0, pady=10, padx=20, sticky="nsew", columnspan=2)
+
+        edit_delete_control_frame = ctk.CTkFrame(frame)
+        edit_delete_control_frame.grid(row=3, column=0, pady=10, padx=20, sticky="ew", columnspan=2)
+        edit_delete_control_frame.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(edit_delete_control_frame, text="Entry ID:").grid(row=0, column=0, padx=(5, 0), pady=5, sticky="w")
+        self.id_entry_edit_delete = ctk.CTkEntry(edit_delete_control_frame, placeholder_text="Enter ID to Load/Delete")
+        self.id_entry_edit_delete.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        ctk.CTkButton(edit_delete_control_frame, text="Load for Edit", command=self._load_bottle_for_edit).grid(row=0,
+                                                                                                                column=2,
+                                                                                                                padx=5,
+                                                                                                                pady=5)
+        ctk.CTkButton(edit_delete_control_frame, text="Delete Entry", command=self._delete_bottle_gui).grid(row=0,
+                                                                                                            column=3,
+                                                                                                            padx=(0, 5),
+                                                                                                            pady=5)
+
+        edit_container = ctk.CTkFrame(frame, fg_color="transparent")
+        edit_container.grid(row=4, column=0, padx=20, pady=10, sticky="nsew", columnspan=2)
+        edit_container.grid_columnconfigure(0, weight=2)
+        edit_container.grid_columnconfigure(1, weight=1)
+        edit_container.grid_rowconfigure(0, weight=1)
+
+        self.edit_fields_frame = ctk.CTkScrollableFrame(edit_container, label_text="Edit Entry Details")
+        self.edit_fields_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.edit_fields_frame.grid_columnconfigure(1, weight=1)
+
+        self.edit_entry_widgets = {}
+        row_counter = 0
+        for i, (label_text, key) in enumerate(self.fields):
+            label = ctk.CTkLabel(self.edit_fields_frame, text=label_text, anchor="w")
+            label.grid(row=i, column=0, padx=(10, 5), pady=5, sticky="w")
+            entry = ctk.CTkEntry(self.edit_fields_frame)
+            entry.grid(row=i, column=1, padx=(5, 10), pady=5, sticky="ew")
+            self.edit_entry_widgets[key] = entry
+            row_counter = i
+
+        row_counter += 1
+        edit_notes_label = ctk.CTkLabel(self.edit_fields_frame, text="Notes/Comments:", anchor="w")
+        edit_notes_label.grid(row=row_counter, column=0, padx=(10, 5), pady=5, sticky="nw")
+        self.edit_notes_entry = ctk.CTkTextbox(self.edit_fields_frame, height=80, wrap="word")
+        self.edit_notes_entry.grid(row=row_counter, column=1, padx=(5, 10), pady=5, sticky="nsew")
+
+        row_counter += 1
+        edit_addresses_label = ctk.CTkLabel(self.edit_fields_frame, text="Related Addresses:", anchor="w")
+        edit_addresses_label.grid(row=row_counter, column=0, padx=(10, 5), pady=5, sticky="nw")
+        self.edit_addresses_entry = ctk.CTkTextbox(self.edit_fields_frame, height=80, wrap="word")
+        self.edit_addresses_entry.grid(row=row_counter, column=1, padx=(5, 10), pady=5, sticky="nsew")
+
+        self.edit_fields_frame.grid_rowconfigure(row_counter, weight=1)
+
+        edit_image_frame = ctk.CTkFrame(edit_container)
+        edit_image_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        edit_image_frame.grid_rowconfigure(0, weight=1)
+        self.edit_image_preview = ctk.CTkLabel(edit_image_frame, text="", image=self.placeholder_image)
+        self.edit_image_preview.grid(row=0, column=0, padx=20, pady=20, sticky="n")
+        select_edit_image_button = ctk.CTkButton(edit_image_frame, text="Change Image", command=self._select_edit_image)
+        select_edit_image_button.grid(row=1, column=0, padx=20, pady=20, sticky="s")
+
+        self.current_edit_bottle_id = None
+        ctk.CTkButton(frame, text="Save Changes", command=self._edit_bottle_gui).grid(row=5, column=0, pady=10,
+                                                                                      columnspan=2)
+
+    def _create_reports_frame(self):
+        frame = ctk.CTkFrame(self.main_content_frame, corner_radius=10)
+        self.frames["ReportsFrame"] = frame
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
+        label = ctk.CTkLabel(frame, text="Collection Reports", font=ctk.CTkFont(size=18, weight="bold"))
+        label.grid(row=0, column=0, pady=20, sticky="w", padx=20)
+        report_buttons_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        report_buttons_frame.grid(row=0, column=1, padx=20, pady=20, sticky="e")
+        ctk.CTkButton(report_buttons_frame, text="Count by Type",
+                      command=lambda: self._generate_report_gui("type")).pack(pady=5, fill="x")
+        ctk.CTkButton(report_buttons_frame, text="Count by Color",
+                      command=lambda: self._generate_report_gui("color")).pack(pady=5, fill="x")
+        ctk.CTkButton(report_buttons_frame, text="List by Condition",
+                      command=lambda: self._generate_report_gui("condition")).pack(pady=5, fill="x")
+        ctk.CTkButton(report_buttons_frame, text="Entries by Era Range",
+                      command=lambda: self._generate_report_gui("era_range")).pack(pady=5, fill="x")
+        self.report_output_textbox = ctk.CTkTextbox(frame, wrap="word")
+        self.report_output_textbox.grid(row=1, column=0, padx=20, pady=10, sticky="nsew", columnspan=2)
+
+    def _select_add_image(self):
+        path = filedialog.askopenfilename(
+            title="Select an Image",
+            filetypes=(("Image Files", "*.jpg *.jpeg *.png *.bmp *.gif"), ("All files", "*.*"))
         )
-        if not image_to_delete:
-            return
+        if path:
+            self.add_image_path = path
+            self._update_image_preview(self.add_image_preview, path, (150, 150))
 
-        try:
-            image_name = os.path.basename(image_to_delete)
-            if image_name in entry['images']:
-                # Remove the image from the entry
-                entry['images'].remove(image_name)
+    def _select_edit_image(self):
+        path = filedialog.askopenfilename(
+            title="Select an Image",
+            filetypes=(("Image Files", "*.jpg *.jpeg *.png *.bmp *.gif"), ("All files", "*.*"))
+        )
+        if path:
+            self.edit_image_path = path
+            self._update_image_preview(self.edit_image_preview, path, (150, 150))
 
-                # Remove the 'images' attribute if the list is now empty
-                if not entry['images']:
-                    del entry['images']
+    def _update_image_preview(self, image_label, path, size):
+        if path and os.path.exists(path):
+            try:
+                img = Image.open(path)
+                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=size)
+                image_label.configure(image=ctk_img)
+            except Exception as e:
+                print(f"Error loading image: {e}")
+                image_label.configure(image=self.placeholder_image)
+        else:
+            image_label.configure(image=self.placeholder_image)
 
-                self.save_data()
+    def _add_bottle_gui(self):
+        new_bottle = {"id": generate_id(self.bottles_data)}
+        required_fields = ["name"]
+        for key, entry_widget in self.entry_widgets.items():
+            value = entry_widget.get().strip()
+            if key in required_fields and not value:
+                messagebox.showerror("Input Error", f"{key.replace('_', ' ').title()} is required!")
+                return
+            new_bottle[key] = value
+        new_bottle["notes"] = self.notes_entry.get("1.0", "end-1c").strip()
+        new_bottle["image_path"] = self.add_image_path
+        new_bottle["related_addresses"] = self.add_addresses_entry.get("1.0", "end-1c").strip()
+        self.bottles_data.append(new_bottle)
+        save_data(self.bottles_data)
+        messagebox.showinfo("Success", f"Entry '{new_bottle['name']}' (ID: {new_bottle['id']}) added successfully!")
+        self._clear_add_form()
 
-                # Delete the image file
-                os.remove(image_to_delete)
+    def _clear_add_form(self):
+        for entry_widget in self.entry_widgets.values():
+            entry_widget.delete(0, 'end')
+        self.notes_entry.delete("1.0", 'end')
+        self.add_addresses_entry.delete("1.0", 'end')
+        self.add_image_path = None
+        self.add_image_preview.configure(image=self.placeholder_image)
 
-                # Refresh the image display
-                self.display_images(entry)
-            else:
-                messagebox.showerror("Error", "Image not found in this entry.")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to delete image: {e}")
-
-    def display_images(self, entry):
-        # Clear existing image labels
-        for widget in self.image_frame.winfo_children():
+    def _view_all_bottles_gui(self):
+        for widget in self.view_scrollable_frame.winfo_children():
             widget.destroy()
-        self.image_labels.clear()
 
-        if 'images' in entry:
-            for i, image_name in enumerate(entry['images']):
+        self.bottles_data = load_data()
+
+        if not self.bottles_data:
+            no_items_label = ctk.CTkLabel(self.view_scrollable_frame, text="No entries found in the collection.")
+            no_items_label.pack(pady=20)
+            return
+
+        for i, bottle in enumerate(self.bottles_data):
+            card = ctk.CTkFrame(self.view_scrollable_frame, border_width=1)
+            card.pack(fill="x", expand=True, padx=10, pady=5)
+            card.grid_columnconfigure(1, weight=1)
+
+            img_label = ctk.CTkLabel(card, text="", image=self.placeholder_image)
+            img_label.grid(row=0, column=0, rowspan=2, padx=10, pady=10)
+            self._update_image_preview(img_label, bottle.get("image_path"), (120, 120))
+
+            details_frame = ctk.CTkFrame(card, fg_color="transparent")
+            details_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+            id_name_text = f"{bottle.get('id', 'N/A')} - {bottle.get('name', 'N/A')}"
+            id_name_label = ctk.CTkLabel(details_frame, text=id_name_text, font=ctk.CTkFont(weight="bold"))
+            id_name_label.pack(anchor="w")
+
+            fields_to_display = [
+                ("Type", "type"),
+                ("Color", "color"),
+                ("Condition", "condition"),
+                ("Era", "era"),
+                ("Embossing", "embossing"),
+                ("Closure Type", "closure_type"),
+                ("Base Markings", "base_markings"),
+                ("Location", "location"),
+            ]
+
+            for label, key in fields_to_display:
+                value = bottle.get(key, "").strip()
+                if value:
+                    field_label = ctk.CTkLabel(details_frame, text=f"{label}: {value}", wraplength=600, justify="left")
+                    field_label.pack(anchor="w", pady=(2, 0))
+
+            notes = bottle.get('notes', '').strip()
+            if notes:
+                notes_text = f"Notes: {notes}"
+                notes_label = ctk.CTkLabel(details_frame, text=notes_text, wraplength=600, justify="left")
+                notes_label.pack(anchor="w", pady=(5, 0))
+
+            addresses = bottle.get('related_addresses', '').strip()
+            if addresses:
+                addresses_text = f"Addresses: {addresses}"
+                addresses_label = ctk.CTkLabel(details_frame, text=addresses_text, wraplength=600, justify="left",
+                                               font=ctk.CTkFont(slant="italic"))
+                addresses_label.pack(anchor="w", pady=(5, 0))
+
+    def _load_bottle_for_edit(self):
+        bottle_id = self.id_entry_edit_delete.get().upper().strip()
+        if not bottle_id:
+            messagebox.showwarning("Input Error", "Please enter an Entry ID to load.")
+            return
+        bottle, index = find_bottle_by_id(bottle_id, self.bottles_data)
+        if bottle:
+            self.current_edit_bottle_id = bottle_id
+            messagebox.showinfo("Entry Loaded", f"Entry '{bottle.get('name')}' loaded for editing.")
+
+            for entry_widget in self.edit_entry_widgets.values(): entry_widget.delete(0, 'end')
+            self.edit_notes_entry.delete("1.0", 'end')
+            self.edit_addresses_entry.delete("1.0", 'end')
+
+            for key, entry_widget in self.edit_entry_widgets.items():
+                if key in bottle:
+                    entry_widget.insert(0, bottle[key])
+            if 'notes' in bottle:
+                self.edit_notes_entry.insert("1.0", bottle['notes'])
+            if 'related_addresses' in bottle:
+                self.edit_addresses_entry.insert("1.0", bottle['related_addresses'])
+
+            self.edit_image_path = bottle.get('image_path')
+            self._update_image_preview(self.edit_image_preview, self.edit_image_path, (150, 150))
+        else:
+            messagebox.showerror("Not Found", f"Entry with ID '{bottle_id}' not found.")
+            self.current_edit_bottle_id = None
+
+    def _edit_bottle_gui(self):
+        if not self.current_edit_bottle_id:
+            messagebox.showwarning("No Entry Selected", "Please load an entry for editing first using its ID.")
+            return
+        bottle_id = self.current_edit_bottle_id
+        bottle_to_edit, index = find_bottle_by_id(bottle_id, self.bottles_data)
+        if bottle_to_edit:
+            updated = False
+            for key, entry_widget in self.edit_entry_widgets.items():
+                new_value = entry_widget.get().strip()
+                if bottle_to_edit.get(key) != new_value:
+                    bottle_to_edit[key] = new_value
+                    updated = True
+
+            new_notes = self.edit_notes_entry.get("1.0", "end-1c").strip()
+            if bottle_to_edit.get('notes') != new_notes:
+                bottle_to_edit['notes'] = new_notes
+                updated = True
+
+            new_addresses = self.edit_addresses_entry.get("1.0", "end-1c").strip()
+            if bottle_to_edit.get('related_addresses') != new_addresses:
+                bottle_to_edit['related_addresses'] = new_addresses
+                updated = True
+
+            if bottle_to_edit.get('image_path') != self.edit_image_path:
+                bottle_to_edit['image_path'] = self.edit_image_path
+                updated = True
+
+            if updated:
+                self.bottles_data[index] = bottle_to_edit
+                save_data(self.bottles_data)
+                messagebox.showinfo("Success", f"Entry '{bottle_id}' updated successfully!")
+                self.show_search_edit_delete_frame()
+            else:
+                messagebox.showinfo("No Changes", "No changes were made to the entry details.")
+        else:
+            messagebox.showerror("Error", "Entry to edit not found.")
+
+    def _search_bottles_gui(self):
+        self.bottles_data = load_data()
+        self.search_results_textbox.delete("1.0", "end")
+        query = self.search_entry.get().lower()
+        search_type = self.search_type_combobox.get()
+        results = []
+        if search_type == "Keyword":
+            for bottle in self.bottles_data:
+                if any(query in str(value).lower() for key, value in bottle.items() if isinstance(value, str)):
+                    results.append(bottle)
+        else:
+            field_map = {"Type": "type", "Color": "color", "Era": "era"}
+            field = field_map.get(search_type)
+            if field:
+                for bottle in self.bottles_data:
+                    if query in bottle.get(field, '').lower():
+                        results.append(bottle)
+        if results:
+            for bottle in results:
+                self.search_results_textbox.insert("end",
+                                                   f"ID: {bottle.get('id')}, Name: {bottle.get('name')}, Type: {bottle.get('type')}\n")
+        else:
+            self.search_results_textbox.insert("end", f"No entries found matching '{query}'.")
+
+    def _delete_bottle_gui(self):
+        bottle_id = self.id_entry_edit_delete.get().upper().strip()
+        if not bottle_id:
+            messagebox.showwarning("Input Error", "Please enter an Entry ID to delete.")
+            return
+        bottle_to_delete, index = find_bottle_by_id(bottle_id, self.bottles_data)
+        if bottle_to_delete:
+            confirm = messagebox.askyesno("Confirm Delete",
+                                          f"Are you sure you want to delete '{bottle_to_delete.get('name')}' (ID: {bottle_id})?")
+            if confirm:
+                del self.bottles_data[index]
+                save_data(self.bottles_data)
+                messagebox.showinfo("Success", f"Entry '{bottle_id}' deleted successfully!")
+                self.show_search_edit_delete_frame()
+            else:
+                messagebox.showinfo("Cancelled", "Deletion cancelled.")
+        else:
+            messagebox.showerror("Not Found", f"Entry with ID '{bottle_id}' not found.")
+
+    def _generate_report_gui(self, report_type):
+        self.bottles_data = load_data()
+        self.report_output_textbox.delete("1.0", "end")
+        output_text = ""
+        if not self.bottles_data:
+            self.report_output_textbox.insert("end", "No entries to report on. Collection is empty.")
+            return
+        if report_type == "type":
+            type_counts = {}
+            for bottle in self.bottles_data:
+                b_type = bottle.get('type', 'Unknown').title()
+                type_counts[b_type] = type_counts.get(b_type, 0) + 1
+            output_text += "--- Entries by Type ---\n"
+            for b_type, count in sorted(type_counts.items()):
+                output_text += f"{b_type}: {count}\n"
+        elif report_type == "color":
+            color_counts = {}
+            for bottle in self.bottles_data:
+                color = bottle.get('color', 'Unknown').title()
+                color_counts[color] = color_counts.get(color, 0) + 1
+            output_text += "--- Entries by Color ---\n"
+            for color, count in sorted(color_counts.items()):
+                output_text += f"{color}: {count}\n"
+        elif report_type == "condition":
+            condition_groups = {}
+            for bottle in self.bottles_data:
+                condition = bottle.get('condition', 'Unknown').title()
+                if condition not in condition_groups:
+                    condition_groups[condition] = []
+                condition_groups[condition].append(bottle.get('name', 'Unnamed'))
+            output_text += "--- Entries by Condition ---\n"
+            for condition, names in sorted(condition_groups.items()):
+                output_text += f"\n{condition}:\n"
+                for name in names:
+                    output_text += f"  - {name}\n"
+        elif report_type == "era_range":
+            start_year_input = ctk.CTkInputDialog(text="Enter start year (e.g., 1850):", title="Era Range").get_input()
+
+            if start_year_input is None:
+                self.report_output_textbox.insert("end", "Era range report cancelled.")
+                return
+
+            end_year_input = ctk.CTkInputDialog(text="Enter end year (e.g., 1870):", title="Era Range").get_input()
+
+            if end_year_input is None:
+                self.report_output_textbox.insert("end", "Era range report cancelled.")
+                return
+
+            if not start_year_input.strip() and not end_year_input.strip():
+                output_text += "No years were entered."
+            else:
                 try:
-                    image_path = os.path.join(os.getcwd(), image_name)
-                    img = Image.open(image_path)
-                    img.thumbnail((100, 100))  # Resize image for display
-                    photo = ImageTk.PhotoImage(img)
-
-                    label = ttk.Label(self.image_frame, image=photo)
-                    label.image = photo  # Keep a reference to avoid garbage collection
-                    label.grid(row=i // 3, column=i % 3, padx=5, pady=5)  # Grid layout (3 images per row)
-                    self.image_labels.append(label)
-
-                    # --- Bind click event to open popup ---
-                    label.bind("<Button-1>", lambda e, path=image_path: self.open_popup(path))
-
-                except Exception as e:
-                    print(f"Failed to load image {image_name}: {e}")
-
-    def open_popup(self, image_path):
-        # Create a new Toplevel window for the popup
-        popup = tk.Toplevel(self.root)
-        popup.title("Zoomable Image")
-
-        # Load and display the image in the popup
-        self.zoom_factor = 1.0  # Initialize zoom factor
-        self.current_image = Image.open(image_path)  # Store the original image
-        photo = ImageTk.PhotoImage(self.current_image)
-        image_label = ttk.Label(popup, image=photo)
-        image_label.image = photo
-        image_label.pack()
-
-        # --- Variables for dragging ---
-        self.drag_start_x = 0
-        self.drag_start_y = 0
-
-        def start_drag(event):
-            self.drag_start_x = event.x
-            self.drag_start_y = event.y
-
-        def drag(event):
-            x = image_label.winfo_x() + event.x - self.drag_start_x
-            y = image_label.winfo_y() + event.y - self.drag_start_y
-            image_label.place(x=x, y=y)
-
-        image_label.bind("<ButtonPress-1>", start_drag)
-        image_label.bind("<B1-Motion>", drag)
-
-        # Bind mouse wheel event for zoom
-        image_label.bind("<MouseWheel>", self.zoom)
-
-    def zoom(self, event):
-        if event.delta > 0:
-            self.zoom_factor *= 1.1  # Zoom in
-        else:
-            self.zoom_factor /= 1.1  # Zoom out
-
-        # Calculate the center of the zoom based on cursor position
-        x = event.x
-        y = event.y
-        width, height = self.current_image.size
-
-        # --- Calculate zoom size while maintaining aspect ratio ---
-        new_width = int(width * self.zoom_factor)
-        new_height = int(height * self.zoom_factor)
-
-        # --- Prevent image from getting too large ---
-        max_width = self.root.winfo_screenwidth() // 2  # Limit to half the screen width
-        max_height = self.root.winfo_screenheight() // 2  # Limit to half the screen height
-        if new_width > max_width or new_height > max_height:
-            return  # Don't zoom if it exceeds the limits
-
-        # Determine the zoom factor that limits the scaling to the smaller dimension
-        if new_width > new_height:
-            zoom_factor = new_height / height
-        else:
-            zoom_factor = new_width / width
-
-        new_width = int(width * zoom_factor)
-        new_height = int(height * zoom_factor)
-
-        # Calculate the bounding box for the zoomed image
-        left = max(0, x - new_width // 2)
-        top = max(0, y - new_height // 2)
-        right = min(width, x + new_width // 2)
-        bottom = min(height, y + new_height // 2)
-
-        # Crop and resize the image
-        zoomed_image = self.current_image.crop((left, top, right, bottom)).resize((new_width, new_height))
-        photo = ImageTk.PhotoImage(zoomed_image)
-
-        # Update the image label in the popup
-        image_label = event.widget  # Get the label from the event
-        image_label.config(image=photo)
-        image_label.image = photo
-
-    def search_entries(self, *args):
-        search_term = self.search_var.get().lower()
-        self.entry_listbox.delete(0, tk.END)
-        for entry in self.entries:
-            if search_term in entry['name'].lower() or \
-                    search_term in entry.get('description', '').lower() or \
-                    any(search_term in str(value).lower() for value in entry.values()):
-                self.entry_listbox.insert(tk.END, entry['name'])
-
-    def bind_motion(self):
-        self.motion_id = self.entry_listbox.bind('<Motion>', self.on_hover)
-
-    def unbind_motion(self):
-        self.entry_listbox.unbind('<Motion>', self.motion_id)
-        self.tooltip.withdraw()
-
-    def on_hover(self, event):
-        index = self.entry_listbox.nearest(event.y)
-        if 0 <= index < len(self.entries):
-            # Get the item's bbox
-            bbox = self.entry_listbox.bbox(index)
-            if bbox:
-                x, y, width, height = bbox  # Unpack bbox tuple
-
-                if y <= event.y <= y + height:  # Check within bounds
-                    entry = self.entries[index]
-
-                    # Create tooltip text
-                    tooltip_text = f"Name: {entry['name']}\n"
-
-                    # Check if description is not blank
-                    description = entry.get('description', '').strip()
-                    if description:
-                        words_per_line = 20
-                        words = description.split()
-                        wrapped_description = "\n".join(
-                            " ".join(words[i:i + words_per_line])
-                            for i in range(0, len(words), words_per_line)
-                        )
-                        tooltip_text += f"Description: {wrapped_description}\n"
-
-                    # Add custom attributes
-                    for attr in sorted(self.custom_attributes):
-                        if attr in entry:
-                            tooltip_text += f"{attr}: {entry[attr]}\n"
-
-                    self.tooltip_label.config(text=tooltip_text)
-
-                    # Position tooltip near cursor
-                    x = self.root.winfo_pointerx() + 15
-                    y = self.root.winfo_pointery() + 10
-                    self.tooltip.geometry(f"+{x}+{y}")
-                    self.tooltip.deiconify()
+                    start_year = int(start_year_input) if start_year_input.strip() else None
+                    end_year = int(end_year_input) if end_year_input.strip() else None
+                except ValueError:
+                    output_text += "Invalid year input. Please enter numbers for years."
+                    self.report_output_textbox.insert("end", output_text)
                     return
 
-        self.tooltip.withdraw()
+                era_results = []
+                for bottle in self.bottles_data:
+                    era_str = bottle.get('era', '')
+                    if not era_str:
+                        continue
 
-    def refresh_entry_list(self):
-        # --- Store selected index ---
-        selected_index = self.entry_listbox.curselection()
-        selected_index = selected_index if selected_index else None
+                    years_in_era = re.findall(r'\d{4}', era_str)
 
-        self.entry_listbox.delete(0, tk.END)
-        for entry in self.entries:
-            self.entry_listbox.insert(tk.END, entry['name'])
+                    bottle_within_range = False
+                    for year_str in years_in_era:
+                        try:
+                            year = int(year_str)
+                            if start_year is not None and year < start_year:
+                                continue
+                            if end_year is not None and year > end_year:
+                                continue
+                            bottle_within_range = True
+                            break
+                        except ValueError:
+                            continue
+                    if bottle_within_range:
+                        era_results.append(bottle)
 
-        # Restore selection if there was one
-        if selected_index is not None:
-            self.entry_listbox.selection_set(selected_index)
-            self.entry_listbox.see(selected_index)
+                if era_results:
+                    start_display = start_year or 'Any'
+                    end_display = end_year or 'Any'
+                    output_text += f"--- Entries from Era Range {start_display} - {end_display} ---\n"
+                    for bottle in era_results:
+                        output_text += f"- {bottle.get('name')} (Era: {bottle.get('era')})\n"
+                else:
+                    output_text += "No entries found within the specified era range.\n"
+        self.report_output_textbox.insert("end", output_text)
 
-    def refresh_custom_attributes(self):
-        # Save current values
-        current_values = {}
-        for attr, var in self.custom_entries.items():
-            current_values[attr] = var.get()
+    def show_add_frame(self):
+        self.show_frame("AddBottleFrame")
+        self._clear_add_form()
 
-        # Clear existing entries
-        for widget in self.custom_frame.winfo_children():
-            widget.destroy()
+    def show_view_frame(self):
+        self.show_frame("ViewAllFrame")
+        self._view_all_bottles_gui()
 
-        self.custom_entries.clear()
+    def show_search_edit_delete_frame(self):
+        self.show_frame("SearchEditDeleteFrame")
+        self.search_results_textbox.delete("1.0", "end")
+        self.id_entry_edit_delete.delete(0, 'end')
+        self.current_edit_bottle_id = None
+        self.edit_fields_frame.configure(label_text="Edit Entry Details")
+        for entry_widget in self.edit_entry_widgets.values():
+            entry_widget.delete(0, 'end')
+        self.edit_notes_entry.delete("1.0", 'end')
+        self.edit_addresses_entry.delete("1.0", 'end')
+        self.edit_image_path = None
+        self.edit_image_preview.configure(image=self.placeholder_image)
 
-        # Recreate custom attribute entries
-        for i, attr in enumerate(sorted(self.custom_attributes)):
-            ttk.Label(self.custom_frame, text=f"{attr}:").grid(row=i, column=0, sticky=tk.W)
-            var = tk.StringVar()
-            # Restore previous value if it existed
-            if attr in current_values:
-                var.set(current_values[attr])
-            self.custom_entries[attr] = var
-            ttk.Entry(self.custom_frame, textvariable=var).grid(row=i, column=1, sticky=tk.EW)
+    def show_reports_frame(self):
+        self.show_frame("ReportsFrame")
+        self.report_output_textbox.delete("1.0", "end")
 
-    def add_attribute(self):
-        new_attr = self.new_attr_var.get().strip()
-        if new_attr and new_attr not in self.custom_attributes:
-            self.custom_attributes.add(new_attr)
-            self.refresh_custom_attributes()
-            self.new_attr_var.set("")
-
-    def delete_attribute(self):
-        attr_to_delete = self.new_attr_var.get().strip()
-        if not attr_to_delete:
-            messagebox.showerror("Error", "Please enter an attribute to delete.")
-            return
-
-        if attr_to_delete not in self.custom_attributes:
-            messagebox.showerror("Error", "Attribute not found.")
-            return
-
-        # Optional: Confirmation dialog
-        if messagebox.askyesno("Confirm Delete",
-                               f"Are you sure you want to delete '{attr_to_delete}'? This may affect existing entries."):
-            try:
-                # Remove the attribute from custom_attributes
-                self.custom_attributes.remove(attr_to_delete)
-
-                # Remove the attribute from all entries
-                for entry in self.entries:
-                    if attr_to_delete in entry:
-                        del entry[attr_to_delete]
-
-                # Refresh the GUI
-                self.refresh_custom_attributes()
-                self.save_data()
-                self.new_attr_var.set("")  # Clear the input field
-            except Exception as e:
-                messagebox.showerror("Error", f"An error occurred while deleting the attribute: {e}")
-
-    def add_entry(self):
-        # Create a blank entry with "Blank Entry" as the name
-        entry = {
-            'name': "Blank Entry",  # Set the name here
-            'description': ''
-        }
-
-        # Add custom attributes with blank values
-        for attr in self.custom_attributes:
-            entry[attr] = ''
-
-        self.entries.append(entry)
-        self.save_data()  # This will now sort the entries
-        self.refresh_entry_list()
-
-        # Select the newly added entry (always select the last item)
-        self.entry_listbox.selection_clear(0, tk.END)
-        self.entry_listbox.selection_set(tk.END)  # Select the last item (new entry)
-        self.entry_listbox.see(tk.END)  # Make sure it's visible
-
-        self.on_select_entry(None)  # Call on_select_entry explicitly
-
-        # Optionally, you can automatically focus on the name entry field
-        self.name_entry.focus()
-
-    def on_select_entry(self, event):
-        selection = self.entry_listbox.curselection()
-        if not selection:
-            if event is None:  # Handle explicit call
-                index = self.entry_listbox.size() - 1  # Get the last index
-            else:
-                return  # No action if no selection is made
-        else:
-            index = selection[0]  # Get the first element of the tuple (the index)
-
-        entry = self.entries[index]
-
-        # Update the entry fields with selected entry data
-        self.name_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
-        self.name_entry.insert("1.0", entry.get('name', ''))
-        self.desc_entry.delete("1.0", tk.END)  # Clear and insert into Text widget
-        self.desc_entry.insert("1.0", entry.get('description', ''))
-
-        # Fill custom attributes
-        for attr, var in self.custom_entries.items():
-            var.set(entry.get(attr, ''))
-
-        # Display associated images for the selected entry
-        if selection:
-            self.display_images(entry)
-
-    def update_entry(self):
-        selection = self.entry_listbox.curselection()
-        if not selection:
-            messagebox.showerror("Error", "Please select an entry to update!")
-            return
-
-        index = selection[0]  # Get the first element of the tuple (the index)
-        entry = self.entries[index]
-
-        entry['name'] = self.name_entry.get("1.0", tk.END).strip()
-        entry['description'] = self.desc_entry.get("1.0", tk.END)
-
-        for attr, var in self.custom_entries.items():
-            value = var.get()
-            if value:
-                entry[attr] = value
-            elif attr in entry:
-                del entry[attr]
-
-        updated_entry_name = entry['name']  # Store the name
-
-        self.entries.sort(key=lambda x: x['name'].lower())  # Sort here
-        self.save_data()
-        self.refresh_entry_list()
-
-        updated_index = self.find_entry_index(updated_entry_name)  # Find the new index
-
-        if updated_index is not None:
-            self.entry_listbox.selection_clear(0, tk.END)
-            self.entry_listbox.selection_set(updated_index)
-            self.entry_listbox.see(updated_index)  # Make sure it's visible
-
-        messagebox.showinfo("Applied", "Changes applied successfully!")
-
-    def find_entry_index(self, entry_name):
-        for i, entry in enumerate(self.entries):
-            if entry['name'] == entry_name:
-                return i
-        return None  # Entry not found
-
-    def delete_entry(self):
-        selection = self.entry_listbox.curselection()
-        if not selection:
-            messagebox.showerror("Error", "Please select an entry to delete!")
-            return
-
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
-            # Extract the index from the tuple
-            index = selection[0] # Get the first element of the tuple
-
-            del self.entries[index]
-            self.save_data()
-            self.refresh_entry_list()
-            self.clear_inputs()
-
-            # Clear the selected index after deleting
-            self.selected_index = None
-
-
-    def on_select_entry(self, event=None):
-        selection = self.entry_listbox.curselection()
-        if selection:
-            index = selection[0]
-
-            # Update the selected index
-            self.selected_index = index
-
-            entry = self.entries[index]
-
-            self.name_entry.delete("1.0", tk.END)
-            self.name_entry.insert("1.0", entry.get('name', ''))
-            self.desc_entry.delete("1.0", tk.END)
-            self.desc_entry.insert("1.0", entry.get('description', ''))
-
-            for attr, var in self.custom_entries.items():
-                var.set(entry.get(attr, ''))
-
-            self.display_images(entry)
-
-        elif self.selected_index is not None:  # No selection but had one before
-            # Keep the previous selection active
-            self.entry_listbox.selection_set(self.selected_index)
-
-    def clear_inputs(self):
-        self.name_entry.delete("1.0", tk.END)  # Clear Text widget
-        self.desc_entry.delete("1.0", tk.END)  # Clear Text widget
-        for var in self.custom_entries.values():
-            var.set("")
-
-        # Clear the selected index
-        self.selected_index = None
-
-        # Update the listbox to reflect the cleared input
-        self.refresh_entry_list()
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = EntryCollectionManager(root)
-    root.mainloop()
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("blue")
+    app = EntryDexApp()
+    app.mainloop()
