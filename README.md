@@ -2,7 +2,9 @@ Just a program I wrote for myself and hopefully for others to use. I persoanlly 
 The program stores all attributes and ollection entries in the .json files.
 
 Hi Reddit! 
-
-Make sure to install the latest Python & then run "python EntryDex.py"
+Step 1: Install the latest version of Python
+Step 2: In command prompt, "cd (folder with EntryDex.py)"
+Step 3: pip install -r requirements.txt
+Step4: run "python EntryDex.py"
 
 By u/JustBottleDiggin or @SpaceOrganism
