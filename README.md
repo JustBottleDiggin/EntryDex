@@ -30,3 +30,6 @@ Open **Command Prompt** (Windows) or **Terminal** (macOS/Linux), navigate to the
 cd path\to\EntryDex
 pip install -r requirements.txt
 python EntryDex.py
+```
+
+Built with ❤️ by u/JustBottleDiggin (aka @SpaceOrganism)
