@@ -78,6 +78,8 @@ class EntryDexApp(ctk.CTk):
             ("Color:", "color"), ("Era/Date Range:", "era"),
             ("Condition:", "condition"), ("Embossing/Markings (optional):", "embossing"),
             ("Closure Type (optional):", "closure_type"),
+            # --- THIS IS THE NEW LINE YOU REQUESTED ---
+            ("Finish Type (optional):", "finish_type"),
             ("Base Markings (optional):", "base_markings"),
             ("Location in Collection (optional):", "location")
         ]
@@ -513,7 +515,6 @@ class EntryDexApp(ctk.CTk):
             img_label = ctk.CTkLabel(card, text="", image=self.placeholder_image)
             img_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-            # --- THIS IS THE MODIFIED LINE ---
             # Increased size from (120, 120) to (250, 250) for larger, clearer thumbnails
             self._update_image_preview(img_label, path=bottle.get("image_path"), size=(250, 250))
 
