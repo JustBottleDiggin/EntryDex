@@ -78,7 +78,6 @@ class EntryDexApp(ctk.CTk):
             ("Color:", "color"), ("Era/Date Range:", "era"),
             ("Condition:", "condition"), ("Embossing/Markings (optional):", "embossing"),
             ("Closure Type (optional):", "closure_type"),
-            # --- THIS IS THE NEW LINE YOU REQUESTED ---
             ("Finish Type (optional):", "finish_type"),
             ("Base Markings (optional):", "base_markings"),
             ("Location in Collection (optional):", "location")
@@ -287,7 +286,6 @@ class EntryDexApp(ctk.CTk):
         ctk.CTkButton(frame, text="Save Changes", command=self._edit_bottle_gui).grid(row=4, column=0, pady=(10, 20))
 
     def _create_reports_frame(self):
-        # This frame's code remains largely the same as it was already well-structured.
         frame = ctk.CTkFrame(self.main_content_frame, corner_radius=10)
         self.frames["ReportsFrame"] = frame
         frame.grid_columnconfigure(0, weight=1)
@@ -356,7 +354,6 @@ class EntryDexApp(ctk.CTk):
         if not pil_image:
             return None
         try:
-            # Use PNG to support transparency and avoid compression artifacts
             destination_path = os.path.join(IMAGE_DIR, f"{bottle_id}.png")
             pil_image.save(destination_path, "PNG")
             return destination_path
@@ -368,7 +365,6 @@ class EntryDexApp(ctk.CTk):
     def _add_bottle_gui(self):
         new_bottle = {"id": generate_id(self.bottles_data)}
 
-        # Populate data from form widgets
         for key, widget in self.add_widgets.items():
             if isinstance(widget, ctk.CTkEntry):
                 new_bottle[key] = widget.get().strip()
@@ -379,9 +375,7 @@ class EntryDexApp(ctk.CTk):
             messagebox.showerror("Input Error", "Name/Description is a required field.")
             return
 
-        # Save the image and get its new path
         new_bottle["image_path"] = self._save_image(self.add_image_pil, new_bottle["id"])
-
         self.bottles_data.append(new_bottle)
         save_data(self.bottles_data)
         messagebox.showinfo("Success", f"Entry '{new_bottle['name']}' (ID: {new_bottle['id']}) added successfully!")
@@ -389,29 +383,25 @@ class EntryDexApp(ctk.CTk):
 
     def _edit_bottle_gui(self):
         if not self.current_edit_bottle_id:
-            messagebox.showwarning("No Entry Loaded",
-                                   "Please load an entry for editing first by clicking a search result.")
+            messagebox.showwarning("No Entry Loaded", "Please load an entry for editing first.")
             return
 
         bottle_to_edit, index = find_bottle_by_id(self.current_edit_bottle_id, self.bottles_data)
         if not bottle_to_edit:
-            messagebox.showerror("Error", "Entry to edit not found. It may have been deleted.")
+            messagebox.showerror("Error", "Entry to edit not found.")
             return
 
-        # Update data from form widgets
         for key, widget in self.edit_widgets.items():
             if isinstance(widget, ctk.CTkEntry):
                 bottle_to_edit[key] = widget.get().strip()
             elif isinstance(widget, ctk.CTkTextbox):
                 bottle_to_edit[key] = widget.get("1.0", "end-1c").strip()
 
-        # Update the image if it was changed or rotated
         bottle_to_edit["image_path"] = self._save_image(self.edit_image_pil, bottle_to_edit["id"])
-
         self.bottles_data[index] = bottle_to_edit
         save_data(self.bottles_data)
         messagebox.showinfo("Success", f"Entry '{self.current_edit_bottle_id}' updated successfully!")
-        self._clear_search_edit_form()  # Reset the form after saving
+        self._clear_search_edit_form()
 
     def _delete_bottle_gui(self):
         bottle_id = self.id_entry_delete.get().upper().strip()
@@ -424,7 +414,6 @@ class EntryDexApp(ctk.CTk):
             confirm = messagebox.askyesno("Confirm Delete",
                                           f"Are you sure you want to delete '{bottle_to_delete.get('name')}' (ID: {bottle_id})?")
             if confirm:
-                # Delete associated image file
                 image_path = bottle_to_delete.get("image_path")
                 if image_path and os.path.exists(image_path):
                     os.remove(image_path)
@@ -432,19 +421,18 @@ class EntryDexApp(ctk.CTk):
                 del self.bottles_data[index]
                 save_data(self.bottles_data)
                 messagebox.showinfo("Success", f"Entry '{bottle_id}' deleted successfully!")
-                self._clear_search_edit_form()  # Refresh UI
+                self._clear_search_edit_form()
         else:
             messagebox.showerror("Not Found", f"Entry with ID '{bottle_id}' not found.")
 
     def _load_bottle_for_edit(self, bottle_id):
-        self._clear_search_edit_form()  # Clear previous data first
+        self._clear_search_edit_form()
         bottle, index = find_bottle_by_id(bottle_id, self.bottles_data)
 
         if bottle:
             self.current_edit_bottle_id = bottle_id
             self.edit_fields_frame.configure(label_text=f"Editing: {bottle.get('name', '')} ({bottle_id})")
 
-            # Populate form
             for key, widget in self.edit_widgets.items():
                 value = bottle.get(key, "")
                 if isinstance(widget, ctk.CTkEntry):
@@ -452,18 +440,17 @@ class EntryDexApp(ctk.CTk):
                 elif isinstance(widget, ctk.CTkTextbox):
                     widget.insert("1.0", value)
 
-            # Load image into preview and PIL object
             image_path = bottle.get('image_path')
             if image_path and os.path.exists(image_path):
                 self.edit_image_pil = Image.open(image_path)
                 self._update_image_preview(self.edit_image_preview, pil_image=self.edit_image_pil)
             else:
                 self.edit_image_pil = None
-                self._update_image_preview(self.edit_image_preview)  # Show placeholder
+                self._update_image_preview(self.edit_image_preview)
 
             messagebox.showinfo("Loaded", f"Entry '{bottle_id}' is ready for editing.")
         else:
-            messagebox.showerror("Not Found", f"Could not load Entry ID '{bottle_id}'. It may have been deleted.")
+            messagebox.showerror("Not Found", f"Could not load Entry ID '{bottle_id}'.")
 
     def _search_bottles_gui(self):
         self.bottles_data = load_data()
@@ -475,7 +462,7 @@ class EntryDexApp(ctk.CTk):
         results = []
 
         if not query:
-            results = self.bottles_data  # Show all if query is empty
+            results = self.bottles_data
         elif search_type == "Keyword":
             for bottle in self.bottles_data:
                 if any(query in str(value).lower() for value in bottle.values()):
@@ -513,9 +500,8 @@ class EntryDexApp(ctk.CTk):
             card.grid_columnconfigure(1, weight=1)
 
             img_label = ctk.CTkLabel(card, text="", image=self.placeholder_image)
-            img_label.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+            img_label.grid(row=0, column=0, rowspan=2, padx=10, pady=10, sticky="n")
 
-            # Increased size from (120, 120) to (250, 250) for larger, clearer thumbnails
             self._update_image_preview(img_label, path=bottle.get("image_path"), size=(250, 250))
 
             details_frame = ctk.CTkFrame(card, fg_color="transparent")
@@ -593,7 +579,6 @@ class EntryDexApp(ctk.CTk):
         self.edit_image_pil = None
         self.edit_image_preview.configure(image=self.placeholder_image)
 
-        # Clear previous search results as well
         for widget in self.search_results_frame.winfo_children():
             widget.destroy()
 
